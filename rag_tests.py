@@ -48,28 +48,49 @@ class RAG():
 
     def Kb(self, fileadress: str):
         splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=60)
-
+        ingested_file = './chroma_db/ingested_files.txt'
         
-        if os.path.exists('Knowledge_base'):
+        if os.path.exists('./chroma_db'):
             vector_store = Chroma(
                 collection_name='efficiency_trials',
                 embedding_function=embedding_model,
-                persist_directory='./Knowledge_base'
+                persist_directory='./chroma_db'
             )
             
+            ingested = set()
+            if os.path.exists(ingested_file):
+                with open(ingested_file, 'r') as f:
+                    ingested = set(f.read().splitlines())
+            
+            new_docs = []
+            new_files = []
             for filename in os.listdir(fileadress):
-                if filename.endswith('.pdf'):
+                if filename.endswith('.pdf') and filename not in ingested:
+                    loader = PyPDFLoader(os.path.join(fileadress, filename))
+                    docs = loader.load()
+                    new_docs.extend(docs)
+                    self.all_docs.extend(docs)
+                    new_files.append(filename)
+                elif filename.endswith('.pdf'):
                     loader = PyPDFLoader(os.path.join(fileadress, filename))
                     self.all_docs.extend(loader.load())
-            print('loaded existing knowledge base')
+            
+            if new_docs:
+                chunks = splitter.split_documents(new_docs)
+                vector_store.add_documents(chunks)
+                with open(ingested_file, 'a') as f:
+                    f.write('\n'.join(new_files) + '\n')
+                print(f'added {len(chunks)} chunks from {new_files}')
+            else:
+                print('loaded existing knowledge base, no new files')
+            
             return vector_store
-
         
         for filename in os.listdir(fileadress):
             if filename.endswith('.pdf'):
                 loader = PyPDFLoader(os.path.join(fileadress, filename))
                 self.all_docs.extend(loader.load())
-
+        
         chunks = splitter.split_documents(self.all_docs)
         vector_store = Chroma.from_documents(
             documents=chunks,
@@ -77,6 +98,12 @@ class RAG():
             collection_name='efficiency_trials',
             persist_directory='./chroma_db'
         )
+        
+        os.makedirs('./chroma_db', exist_ok=True)
+        with open(ingested_file, 'w') as f:
+            filenames = [f for f in os.listdir(fileadress) if f.endswith('.pdf')]
+            f.write('\n'.join(filenames) + '\n')
+        
         print(f'imported {len(chunks)} chunks from {fileadress}')
         return vector_store
 
@@ -136,4 +163,4 @@ def llm_call(query:str):
     print(answer)
     
     
-llm_call("what optimizer did the authors use?")
+llm_call("what optimizer did the authors use? and with what parameters")

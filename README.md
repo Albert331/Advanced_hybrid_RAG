@@ -104,7 +104,6 @@ llm_call("what optimizer did the authors use?")
 ```
 Advanced_hybrid_RAG/
 ├── Knowledge_base/      # Drop PDFs here
-├── chroma_db/           # Auto-generated, ChromaDB persistence
 ├── rag_tests.py         # RAG class + llm_call
 ├── .gitignore
 ├── .env                 # Not committed
